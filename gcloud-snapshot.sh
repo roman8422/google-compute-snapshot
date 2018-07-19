@@ -34,10 +34,16 @@ usage() {
 
 setScriptOptions()
 {
-    while getopts ":d:" o; do
+    while getopts ":d:n:z:" o; do
       case "${o}" in
         d)
           opt_d=${OPTARG}
+          ;;
+        n)
+          INSTANCE_NAME_ARG=${OPTARG}
+          ;;
+        z)
+          INSTANCE_ZONE_ARG=${OPTARG}
           ;;
 
         *)
@@ -61,8 +67,13 @@ setScriptOptions()
 
 getInstanceName()
 {
-    # get the name for this vm
-    local instance_name="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/hostname" -H "Metadata-Flavor: Google")"
+    if [[ -n ${INSTANCE_NAME_ARG} ]]; then
+      # use provided instance name
+      local instance_name="${INSTANCE_NAME_ARG}"
+    else
+      # get the name for this vm
+      local instance_name="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/hostname" -H "Metadata-Flavor: Google")"
+    fi
 
     # strip out the instance name from the fullly qualified domain name the google returns
     echo -e "${instance_name%%.*}"
@@ -75,7 +86,14 @@ getInstanceName()
 
 getInstanceId()
 {
-    echo -e "$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/id" -H "Metadata-Flavor: Google")"
+    if [[ -n ${INSTANCE_NAME_ARG} ]]; then
+      # find id of instance with provided name
+      local instance_id="$(gcloud compute instances describe ${INSTANCE_NAME_ARG} --zone ${INSTANCE_ZONE_ARG} --format='value(id)')"
+    else
+      # get the name for this vm
+      local instance_id="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/id" -H "Metadata-Flavor: Google")"
+    fi
+    echo -e "${instance_id}"
 }
 
 
@@ -85,7 +103,11 @@ getInstanceId()
 
 getInstanceZone()
 {
-    local instance_zone="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")"
+    if [[ -n $INSTANCE_ZONE_ARG ]]; then
+      local instance_zone=$INSTANCE_ZONE_ARG
+    else
+      local instance_zone="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" -H "Metadata-Flavor: Google")"
+    fi
 
     # strip instance zone out of response
     echo -e "${instance_zone##*/}"
